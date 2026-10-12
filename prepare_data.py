@@ -61,12 +61,32 @@ def convert_svm_rank_to_libsvm_and_queries(
     print(f"Completed in {elapsed:.2f}s | Queries extracted: {len(group_sizes)}")
 
 
-if __name__ == "__main__":
-    base_dir = "data/MSLR-WEB10K/Fold1"
+def process_all_folds(base_dataset_dir: str, num_folds: int = 5) -> None:
+    """
+    Iterates through all folds in the dataset directory and applies the sanitization pipeline.
+    """
+    for fold_idx in range(1, num_folds + 1):
+        fold_dir = os.path.join(base_dataset_dir, f"Fold{fold_idx}")
+        
+        if not os.path.exists(fold_dir):
+            print(f"Warning: Directory {fold_dir} not found. Skipping fold {fold_idx}.")
+            continue
+            
+        print(f"\n--- Starting processing {fold_dir} ---")
+        for split in ["train", "vali", "test"]:
+            convert_svm_rank_to_libsvm_and_queries(
+                svm_rank_input_path=os.path.join(fold_dir, f"{split}.txt"),
+                libsvm_output_path=os.path.join(fold_dir, f"{split}_clean.txt"),
+                query_output_path=os.path.join(fold_dir, f"{split}_clean.txt.query")
+            )
 
-    for split in ["train", "vali", "test"]:
-        convert_svm_rank_to_libsvm_and_queries(
-            svm_rank_input_path=f"{base_dir}/{split}.txt",
-            libsvm_output_path=f"{base_dir}/{split}_clean.txt",
-            query_output_path=f"{base_dir}/{split}_clean.txt.query"
-        )
+
+if __name__ == "__main__":
+    DATASET_ROOT = "data/MSLR-WEB10K"
+    
+    print("Starting Data Sanitization pipeline for all folds...")
+    global_start = time.time()
+    
+    process_all_folds(base_dataset_dir=DATASET_ROOT, num_folds=5)
+    
+    print(f"\nPipeline completed globally in {time.time() - global_start:.2f} seconds.")
