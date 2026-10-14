@@ -1,7 +1,7 @@
-import gc
-
-import lightgbm as lgb
+import os
 import time
+import gc
+import lightgbm as lgb
 import numpy as np
 
 def load_fold_datasets(fold_num: int, enable_efb: bool):
@@ -33,25 +33,31 @@ def load_fold_datasets(fold_num: int, enable_efb: bool):
     return train_data, valid_data, test_data
 
 
-def run_experiment(fold_num: int, run_name: str, use_goss: bool, use_efb: bool):
-    print(f"\n[{run_name}] Preparing data for Fold {fold_num} (EFB={'ON' if use_efb else 'OFF'})...")
+import time
+import lightgbm as lgb
+# Rimosso import os e gc
+
+def run_experiment(conf_name: str, use_goss: bool, use_efb: bool):
+    fold = 1
     
-    # load the datasets for the current fold
-    train_data, valid_data, test_data = load_fold_datasets(fold_num, enable_efb=use_efb)
+    print(f"\n{'='*50}")
+    print(f"Start experiment: {conf_name}")
+    print(f"{'='*50}")
     
-    # configuration for the LightGBM model
+    train_data, valid_data, test_data = load_fold_datasets(fold_num=fold, enable_efb=use_efb)
+    
     params = {
         "objective": "lambdarank",
         "metric": "ndcg",
         "ndcg_eval_at": [1, 3, 5, 10],
         "learning_rate": 0.05,
-        "min_child_weight": 100, 
+        "min_child_weight": 100,
         "num_leaves": 255,
         "verbose": -1,
-        "seed": 42
+        "seed": 42,
+        "num_threads": 1
     }
     
-    # inject the requested sampling strategy
     if use_goss:
         params["data_sample_strategy"] = "goss"
         params["top_rate"] = 0.1
@@ -60,40 +66,25 @@ def run_experiment(fold_num: int, run_name: str, use_goss: bool, use_efb: bool):
         params["data_sample_strategy"] = "bagging"
         params["bagging_fraction"] = 1.0
         params["bagging_freq"] = 0
-        
-    print(f"[{run_name}] Training in progress...")
-    start_time = time.time()
-    
-    # define a dictionary to collect the NDCG history
+
     evals_result = {}
+    start_time = time.time()
     
     model = lgb.train(
         params=params,
         train_set=train_data,
-        num_boost_round=1000, 
-        valid_sets=[valid_data, test_data], # ignore the train set in the log for visual clarity
+        num_boost_round=1000,
+        valid_sets=[valid_data, test_data],
         valid_names=["valid", "test"],
         callbacks=[
             lgb.log_evaluation(period=200),
-            lgb.record_evaluation(evals_result) # save all scores for plotting
+            lgb.record_evaluation(evals_result)
         ]
     )
     
     elapsed_time = time.time() - start_time
     final_ndcg = evals_result['test']['ndcg@10'][-1]
     
-    print(f"[{run_name}] Completed in {elapsed_time:.2f}s | NDCG@10: {final_ndcg:.4f}")
-
-    # cleanup memory from the current fold to avoid memory leaks
-    del train_data
-    del valid_data
-    del test_data
-    del model
-    gc.collect()
-    
-    # Return the data needed for plotting
-    return {
-        "name": run_name,
-        "time": elapsed_time,
-        "ndcg_history": evals_result['test']['ndcg@10']
-    }
+    print(f"\n[Result] {conf_name}]")
+    print(f"Elapsed time: {elapsed_time:.2f} seconds")
+    print(f"Final NDCG@10:      {final_ndcg:.4f}\n")
