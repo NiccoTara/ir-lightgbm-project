@@ -1,6 +1,4 @@
-import os
 import time
-import gc
 import lightgbm as lgb
 import numpy as np
 
@@ -32,12 +30,28 @@ def load_fold_datasets(fold_num: int, enable_efb: bool):
     
     return train_data, valid_data, test_data
 
+class TimeTrackingCallback:
+    """
+    Custom LightGBM callback to record the cumulative elapsed time 
+    at the end of each boosting iteration.
+    """
+    def __init__(self):
+        self.start_time = None
+        self.time_history = []
 
-import time
-import lightgbm as lgb
-# Rimosso import os e gc
+    def __call__(self, env):
+        # env is a lightgbm.callback.CallbackEnv object
+        if self.start_time is None:
+            # Initialize the start time at the very first iteration
+            self.start_time = time.time()
+        
+        # Calculate the elapsed time since the beginning of training
+        elapsed = time.time() - self.start_time
+        
+        # Append the cumulative time to our history list
+        self.time_history.append(elapsed)
 
-def run_experiment(conf_name: str, use_goss: bool, use_efb: bool):
+def run_experiment(conf_name: str, use_goss: bool, use_efb: bool, return_dict):
     fold = 1
     
     print(f"\n{'='*50}")
@@ -69,7 +83,9 @@ def run_experiment(conf_name: str, use_goss: bool, use_efb: bool):
 
     evals_result = {}
     start_time = time.time()
-    
+
+    time_tracker = TimeTrackingCallback()
+
     model = lgb.train(
         params=params,
         train_set=train_data,
@@ -78,7 +94,8 @@ def run_experiment(conf_name: str, use_goss: bool, use_efb: bool):
         valid_names=["valid", "test"],
         callbacks=[
             lgb.log_evaluation(period=200),
-            lgb.record_evaluation(evals_result)
+            lgb.record_evaluation(evals_result),
+            time_tracker
         ]
     )
     
@@ -88,3 +105,9 @@ def run_experiment(conf_name: str, use_goss: bool, use_efb: bool):
     print(f"\n[Result] {conf_name}]")
     print(f"Elapsed time: {elapsed_time:.2f} seconds")
     print(f"Final NDCG@10:      {final_ndcg:.4f}\n")
+
+    return_dict[conf_name] = {
+        "time": elapsed_time,
+        "ndcg_history": evals_result['test']['ndcg@10'],
+        "time_history": time_tracker.time_history
+    }
