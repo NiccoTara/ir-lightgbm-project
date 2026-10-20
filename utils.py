@@ -51,7 +51,7 @@ class TimeTrackingCallback:
         # Append the cumulative time to our history list
         self.time_history.append(elapsed)
 
-def run_experiment(conf_name: str, use_goss: bool, use_efb: bool, return_dict):
+def run_experiment(conf_name: str, use_goss: bool, use_efb: bool, is_sgb: bool, return_dict):
     fold = 1
     
     print(f"\n{'='*50}")
@@ -69,13 +69,19 @@ def run_experiment(conf_name: str, use_goss: bool, use_efb: bool, return_dict):
         "num_leaves": 255,
         "verbose": -1,
         "seed": 42,
-        "num_threads": 1
+        "num_threads": 6
     }
     
     if use_goss:
         params["data_sample_strategy"] = "goss"
         params["top_rate"] = 0.1
         params["other_rate"] = 0.1
+    elif is_sgb:
+        params["data_sample_strategy"] = "bagging"
+        params["bagging_fraction"] = 0.2
+        params["bagging_freq"] = 1 
+        # Crucial: lower min_child_weight to prevent under-fitting with less data
+        params["min_child_weight"] = 20
     else:
         params["data_sample_strategy"] = "bagging"
         params["bagging_fraction"] = 1.0
