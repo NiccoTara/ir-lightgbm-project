@@ -26,7 +26,7 @@ def load_fold_datasets(fold_num: int, enable_efb: bool):
     test_data = lgb.Dataset(f"{base_dir}/test_clean.txt", reference=train_data, group=test_group, params=dataset_params)
     
     # force loading into memory and EFB compression (if enabled)
-    train_data.construct()  # force loading into memory and EFB compression (if enabled)
+    train_data.construct()  
     
     return train_data, valid_data, test_data
 
